@@ -19,7 +19,11 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from models import get_db, init_db, seed_data
 
 # ──────────────────────────── App Configuration ────────────────────────────
-app = Flask(__name__)
+# Explicit paths for Vercel compatibility (serverless working dir may differ)
+_base_dir = os.path.dirname(os.path.abspath(__file__))
+app = Flask(__name__,
+            static_folder=os.path.join(_base_dir, 'static'),
+            template_folder=os.path.join(_base_dir, 'templates'))
 # Use a fixed secret key (required for Vercel — os.urandom resets on cold start)
 app.secret_key = os.environ.get('SECRET_KEY', 'quiz-engine-secret-key-change-in-production-2024')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
