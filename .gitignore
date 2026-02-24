@@ -1,10 +1,6 @@
 __pycache__/
 *.pyc
 *.pyo
+quiz_engine.db
 *.db
 .env
-venv/
-.vscode/
-*.egg-info/
-dist/
-build/

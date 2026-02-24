@@ -20,17 +20,16 @@ from models import get_db, init_db, seed_data
 
 # ──────────────────────────── App Configuration ────────────────────────────
 app = Flask(__name__)
-# Use a fixed secret key so sessions survive across Vercel serverless cold starts
+# Use a fixed secret key (required for Vercel — os.urandom resets on cold start)
 app.secret_key = os.environ.get('SECRET_KEY', 'quiz-engine-secret-key-change-in-production-2024')
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Auto-initialize DB on every cold start (needed for Vercel where /tmp is ephemeral)
+# Auto-initialize DB on each request (Vercel /tmp is ephemeral between cold starts)
 _db_initialized = False
 
 @app.before_request
 def ensure_db():
-    """Ensure database is initialized before handling any request."""
     global _db_initialized
     if not _db_initialized:
         init_db()

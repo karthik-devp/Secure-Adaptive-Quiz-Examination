@@ -5,10 +5,12 @@ Uses SQLite with helper functions for CRUD operations.
 
 import sqlite3
 import os
+import sys
 from werkzeug.security import generate_password_hash
 
-# On Vercel, filesystem is read-only except /tmp
-if os.environ.get('VERCEL'):
+# On Vercel (Linux serverless), only /tmp is writable
+# On local (Windows/dev), use project directory
+if os.environ.get('VERCEL') or (sys.platform == 'linux' and not os.access(os.path.dirname(os.path.abspath(__file__)), os.W_OK)):
     DATABASE = '/tmp/quiz_engine.db'
 else:
     DATABASE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'quiz_engine.db')
