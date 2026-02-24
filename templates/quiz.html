@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% block title %}{{ quiz.title }} - QuizEngine{% endblock %}
+{% block head %}
+<style>
+    /* Hide navbar during quiz for focus */
+    .navbar {
+        display: none !important;
+    }
+
+    .main-content {
+        padding-top: 0 !important;
+    }
+</style>
+{% endblock %}
+{% block content %}
+<div class="quiz-container" id="quizContainer">
+    <!-- Quiz Header -->
+    <div class="quiz-header">
+        <div class="quiz-title-bar">
+            <h1><i class="fas fa-graduation-cap"></i> {{ quiz.title }}</h1>
+            <div class="timer-container">
+                <i class="fas fa-clock"></i>
+                <span id="timer" class="timer">{{ quiz.time_limit }}:00</span>
+            </div>
+        </div>
+        <div class="quiz-progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+            </div>
+            <div class="progress-text">
+                <span>Question <span id="currentQ">0</span> of <span id="totalQ">{{ total_questions }}</span></span>
+                <span id="difficultyBadge" class="badge badge-medium">Medium</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="quiz-loading">
+        <div class="spinner"></div>
+        <p>Loading question...</p>
+    </div>
+
+    <!-- Question Card -->
+    <div id="questionCard" class="question-card" style="display:none">
+        <div class="question-meta">
+            <span id="questionDifficulty" class="badge">Medium</span>
+            <span id="questionMarks" class="badge badge-marks">2 marks</span>
+        </div>
+        <h2 id="questionText" class="question-display"></h2>
+        <div id="optionsContainer" class="options-container"></div>
+        <div id="feedbackArea" class="feedback-area" style="display:none"></div>
+        <div class="quiz-actions">
+            <button id="nextBtn" class="btn btn-primary" onclick="handleNext()" disabled>
+                <span id="nextBtnText">Next Question</span> <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Quiz Complete -->
+    <div id="quizComplete" class="quiz-complete" style="display:none">
+        <div class="complete-icon"><i class="fas fa-check-circle"></i></div>
+        <h2>Quiz Complete!</h2>
+        <p>Submitting your answers...</p>
+        <div class="spinner"></div>
+    </div>
+</div>
+
+<!-- Anti-cheat overlay -->
+<div id="antiCheatOverlay" class="anti-cheat-overlay" style="display:none">
+    <div class="anti-cheat-message">
+        <i class="fas fa-exclamation-triangle"></i>
+        <h2>Warning!</h2>
+        <p>Please stay on this page. Leaving may auto-submit your quiz.</p>
+        <button class="btn btn-primary" onclick="dismissWarning()">Return to Quiz</button>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const QUIZ_TIME = {{ quiz.time_limit }} * 60; // seconds
+    const TOTAL_QUESTIONS = {{ total_questions }};
+    let timeLeft = QUIZ_TIME;
+    let timerInterval;
+    let currentQuestion = null;
+    let answeredCount = 0;
+    let selectedAnswer = null;
+    let answerSubmitted = false;
+    let tabSwitchCount = 0;
+
+    // ──── Timer ────
+    function startTimer() {
+        timerInterval = setInterval(() => {
+            timeLeft--;
+            const min = Math.floor(timeLeft / 60);
+            const sec = timeLeft % 60;
+            document.getElementById('timer').textContent =
+                `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+
+            if (timeLeft <= 60) {
+                document.getElementById('timer').classList.add('timer-warning');
+            }
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                autoSubmitQuiz();
+            }
+        }, 1000);
+    }
+
+    // ──── Load Next Question ────
+    function loadQuestion() {
+        document.getElementById('loadingState').style.display = 'flex';
+        document.getElementById('questionCard').style.display = 'none';
+        document.getElementById('feedbackArea').style.display = 'none';
+        selectedAnswer = null;
+        answerSubmitted = false;
+        document.getElementById('nextBtn').disabled = true;
+
+        fetch('/quiz/next_question', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+            .then(r => r.json())
+            .then(data => {
+                document.getElementById('loadingState').style.display = 'none';
+
+                if (data.done) {
+                    finishQuiz();
+                    return;
+                }
+
+                currentQuestion = data.question;
+                document.getElementById('currentQ').textContent = data.question.number;
+                document.getElementById('questionText').textContent = data.question.text;
+
+                // Update difficulty badge
+                const diffBadge = document.getElementById('difficultyBadge');
+                diffBadge.textContent = data.question.difficulty.charAt(0).toUpperCase() + data.question.difficulty.slice(1);
+                diffBadge.className = 'badge badge-' + data.question.difficulty;
+
+                const qDiff = document.getElementById('questionDifficulty');
+                qDiff.textContent = data.question.difficulty.charAt(0).toUpperCase() + data.question.difficulty.slice(1);
+                qDiff.className = 'badge badge-' + data.question.difficulty;
+
+                document.getElementById('questionMarks').textContent = data.question.marks + ' marks';
+
+                // Render options
+                const container = document.getElementById('optionsContainer');
+                container.innerHTML = '';
+                const labels = ['A', 'B', 'C', 'D'];
+                data.question.options.forEach((opt, i) => {
+                    const btn = document.createElement('button');
+                    btn.className = 'option-btn';
+                    btn.innerHTML = `<span class="option-label">${labels[i]}</span><span class="option-text">${opt}</span>`;
+                    btn.onclick = () => selectOption(btn, opt);
+                    container.appendChild(btn);
+                });
+
+                // Update progress
+                const progress = (answeredCount / TOTAL_QUESTIONS) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+
+                // Update next button text
+                if (answeredCount + 1 >= TOTAL_QUESTIONS) {
+                    document.getElementById('nextBtnText').textContent = 'Finish Quiz';
+                } else {
+                    document.getElementById('nextBtnText').textContent = 'Next Question';
+                }
+
+                document.getElementById('questionCard').style.display = 'block';
+            })
+            .catch(err => {
+                console.error(err);
+                document.getElementById('loadingState').innerHTML = '<p>Error loading question. Retrying...</p>';
+                setTimeout(loadQuestion, 2000);
+            });
+    }
+
+    // ──── Select Option ────
+    function selectOption(btn, answer) {
+        if (answerSubmitted) return;
+
+        document.querySelectorAll('.option-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        selectedAnswer = answer;
+        document.getElementById('nextBtn').disabled = false;
+    }
+
+    // ──── Handle Next ────
+    function handleNext() {
+        if (!selectedAnswer || answerSubmitted) return;
+        answerSubmitted = true;
+        document.getElementById('nextBtn').disabled = true;
+
+        // Submit answer
+        fetch('/quiz/answer', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ question_id: currentQuestion.id, answer: selectedAnswer })
+        })
+            .then(r => r.json())
+            .then(data => {
+                // Show feedback
+                const feedback = document.getElementById('feedbackArea');
+                if (data.correct) {
+                    feedback.innerHTML = '<i class="fas fa-check-circle"></i> Correct!';
+                    feedback.className = 'feedback-area feedback-correct';
+                } else {
+                    feedback.innerHTML = `<i class="fas fa-times-circle"></i> Wrong! Correct answer: ${data.correct_answer}`;
+                    feedback.className = 'feedback-area feedback-wrong';
+                }
+                feedback.style.display = 'block';
+
+                // Highlight options
+                document.querySelectorAll('.option-btn').forEach(btn => {
+                    const optText = btn.querySelector('.option-text').textContent;
+                    if (optText === data.correct_answer) {
+                        btn.classList.add('option-correct');
+                    } else if (optText === selectedAnswer && !data.correct) {
+                        btn.classList.add('option-wrong');
+                    }
+                    btn.onclick = null;
+                });
+
+                answeredCount++;
+
+                // Auto-advance after 1.2 seconds
+                setTimeout(() => {
+                    if (answeredCount >= TOTAL_QUESTIONS) {
+                        finishQuiz();
+                    } else {
+                        loadQuestion();
+                    }
+                }, 1200);
+            });
+    }
+
+    // ──── Finish Quiz ────
+    function finishQuiz() {
+        clearInterval(timerInterval);
+        document.getElementById('questionCard').style.display = 'none';
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('quizComplete').style.display = 'flex';
+
+        // Submit quiz
+        fetch('/quiz/submit', { method: 'POST', headers: { 'Content-Type': 'application/json' } })
+            .then(r => {
+                if (r.redirected) {
+                    window.location.href = r.url;
+                } else {
+                    window.location.href = '/dashboard';
+                }
+            });
+    }
+
+    // ──── Auto Submit on Timer End ────
+    function autoSubmitQuiz() {
+        finishQuiz();
+    }
+
+    // ──── Anti-Cheat: Tab Switching ────
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            tabSwitchCount++;
+            if (tabSwitchCount >= 3) {
+                autoSubmitQuiz();
+            }
+        } else {
+            if (tabSwitchCount > 0 && tabSwitchCount < 3) {
+                document.getElementById('antiCheatOverlay').style.display = 'flex';
+            }
+        }
+    });
+
+    function dismissWarning() {
+        document.getElementById('antiCheatOverlay').style.display = 'none';
+    }
+
+    // ──── Anti-Cheat: Disable Right Click ────
+    document.addEventListener('contextmenu', e => e.preventDefault());
+
+    // ──── Anti-Cheat: Prevent Back Navigation ────
+    history.pushState(null, null, location.href);
+    window.addEventListener('popstate', () => {
+        history.pushState(null, null, location.href);
+    });
+
+    // ──── Anti-Cheat: Warn on Page Unload ────
+    window.addEventListener('beforeunload', e => {
+        e.preventDefault();
+        e.returnValue = '';
+    });
+
+    // ──── Start Quiz ────
+    startTimer();
+    loadQuestion();
+</script>
+{% endblock %}

@@ -1,0 +1,185 @@
+{% extends 'base.html' %}
+{% block title %}Result: {{ result.quiz_title }} - QuizEngine{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <div class="page-header">
+        <h1><i class="fas fa-chart-pie"></i> Quiz Result</h1>
+        {% if session.get('role') == 'admin' %}
+        <a href="{{ url_for('admin_results') }}" class="btn btn-outline"><i class="fas fa-arrow-left"></i> All
+            Results</a>
+        {% else %}
+        <a href="{{ url_for('student_dashboard') }}" class="btn btn-outline"><i class="fas fa-arrow-left"></i>
+            Dashboard</a>
+        {% endif %}
+    </div>
+
+    <!-- Result Summary -->
+    <div class="result-hero {% if result.percentage >= 40 %}result-pass{% else %}result-fail{% endif %}">
+        <div class="result-status-icon">
+            {% if result.percentage >= 80 %}
+            <i class="fas fa-trophy"></i>
+            {% elif result.percentage >= 60 %}
+            <i class="fas fa-medal"></i>
+            {% elif result.percentage >= 40 %}
+            <i class="fas fa-check-circle"></i>
+            {% else %}
+            <i class="fas fa-times-circle"></i>
+            {% endif %}
+        </div>
+        <h2>{{ result.quiz_title }}</h2>
+        <div class="result-score-big">{{ "%.1f"|format(result.percentage) }}%</div>
+        <div class="result-status-label">
+            {% if result.percentage >= 80 %}
+            🌟 Excellent Performance!
+            {% elif result.percentage >= 60 %}
+            👏 Good Job! Well Done!
+            {% elif result.percentage >= 40 %}
+            ✅ You Passed! Keep Improving!
+            {% else %}
+            ❌ Failed — Don't give up, try again!
+            {% endif %}
+        </div>
+        {% if session.get('role') == 'admin' %}
+        <p class="result-student-name"><i class="fas fa-user"></i> {{ result.student_name }}</p>
+        {% endif %}
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid stats-grid-5">
+        <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="fas fa-star"></i></div>
+            <div class="stat-info">
+                <h3>{{ result.score }}/{{ result.total }}</h3>
+                <p>Total Score</p>
+            </div>
+        </div>
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="fas fa-check"></i></div>
+            <div class="stat-info">
+                <h3>{{ result.correct_count }}</h3>
+                <p>Correct</p>
+            </div>
+        </div>
+        <div class="stat-card stat-red">
+            <div class="stat-icon"><i class="fas fa-times"></i></div>
+            <div class="stat-info">
+                <h3>{{ result.wrong_count }}</h3>
+                <p>Wrong</p>
+            </div>
+        </div>
+        <div class="stat-card stat-purple">
+            <div class="stat-icon"><i class="fas fa-percentage"></i></div>
+            <div class="stat-info">
+                <h3>{{ "%.1f"|format(result.percentage) }}%</h3>
+                <p>Percentage</p>
+            </div>
+        </div>
+        <div class="stat-card stat-orange">
+            <div class="stat-icon"><i class="fas fa-clock"></i></div>
+            <div class="stat-info">
+                <h3>{{ result.time_taken }}s</h3>
+                <p>Time Taken</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-chart-pie"></i> Correct vs Wrong</h2>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="pieChart"></canvas>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h2><i class="fas fa-chart-bar"></i> Performance by Difficulty</h2>
+            </div>
+            <div class="card-body chart-container">
+                <canvas id="barChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    // Get theme colors
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const textColor = isDark ? '#e2e8f0' : '#1e293b';
+    const gridColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+
+    Chart.defaults.color = textColor;
+
+    // ──── Pie Chart: Correct vs Wrong ────
+    new Chart(document.getElementById('pieChart'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Correct', 'Wrong'],
+            datasets: [{
+                data: [{{ result.correct_count }}, {{ result.wrong_count }}],
+        backgroundColor: ['#10b981', '#ef4444'],
+        borderWidth: 0,
+        hoverOffset: 8
+    }]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { padding: 20, font: { size: 14, family: 'Inter' } }
+            }
+        },
+        cutout: '60%'
+    }
+    });
+
+    // ──── Bar Chart: Performance by Difficulty ────
+    new Chart(document.getElementById('barChart'), {
+        type: 'bar',
+        data: {
+            labels: ['Easy', 'Medium', 'Hard'],
+            datasets: [
+                {
+                    label: 'Correct',
+                    data: [{{ result.easy_correct }}, {{ result.medium_correct }}, {{ result.hard_correct }}],
+        backgroundColor: '#10b981',
+        borderRadius: 6
+                },
+        {
+            label: 'Total',
+            data: [{{ result.easy_total }}, {{ result.medium_total }}, {{ result.hard_total }}],
+        backgroundColor: isDark ? 'rgba(148,163,184,0.3)' : 'rgba(100,116,139,0.3)',
+        borderRadius: 6
+                }
+            ]
+        },
+        options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'bottom',
+                labels: { padding: 20, font: { size: 14, family: 'Inter' } }
+            }
+        },
+        scales: {
+            y: {
+                beginAtZero: true,
+                ticks: { stepSize: 1 },
+                grid: { color: gridColor }
+            },
+            x: {
+                grid: { display: false }
+            }
+        }
+    }
+    });
+</script>
+{% endblock %}

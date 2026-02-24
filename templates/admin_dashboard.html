@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+{% block title %}Admin Dashboard - QuizEngine{% endblock %}
+{% block content %}
+<div class="dashboard">
+    <div class="page-header">
+        <h1><i class="fas fa-tachometer-alt"></i> Admin Dashboard</h1>
+        <a href="{{ url_for('create_quiz') }}" class="btn btn-primary"><i class="fas fa-plus"></i> Create New Quiz</a>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card stat-purple">
+            <div class="stat-icon"><i class="fas fa-clipboard-list"></i></div>
+            <div class="stat-info">
+                <h3>{{ quiz_count }}</h3>
+                <p>Total Quizzes</p>
+            </div>
+        </div>
+        <div class="stat-card stat-blue">
+            <div class="stat-icon"><i class="fas fa-users"></i></div>
+            <div class="stat-info">
+                <h3>{{ student_count }}</h3>
+                <p>Students</p>
+            </div>
+        </div>
+        <div class="stat-card stat-green">
+            <div class="stat-icon"><i class="fas fa-question-circle"></i></div>
+            <div class="stat-info">
+                <h3>{{ question_count }}</h3>
+                <p>Questions</p>
+            </div>
+        </div>
+        <div class="stat-card stat-orange">
+            <div class="stat-icon"><i class="fas fa-trophy"></i></div>
+            <div class="stat-info">
+                <h3>{{ result_count }}</h3>
+                <p>Attempts</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quizzes Table -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-clipboard-list"></i> Manage Quizzes</h2>
+        </div>
+        <div class="card-body">
+            {% if quizzes %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Title</th>
+                            <th>Total Marks</th>
+                            <th>Time Limit</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for quiz in quizzes %}
+                        <tr>
+                            <td><span class="badge badge-id">#{{ quiz.id }}</span></td>
+                            <td><strong>{{ quiz.title }}</strong></td>
+                            <td>{{ quiz.total_marks }} marks</td>
+                            <td>{{ quiz.time_limit }} min</td>
+                            <td class="actions-cell">
+                                <a href="{{ url_for('edit_quiz', quiz_id=quiz.id) }}" class="btn btn-sm btn-info"><i
+                                        class="fas fa-edit"></i> Edit</a>
+                                <form method="POST" action="{{ url_for('delete_quiz', quiz_id=quiz.id) }}"
+                                    style="display:inline"
+                                    onsubmit="return confirm('Delete this quiz and all its questions?')">
+                                    <button class="btn btn-sm btn-danger"><i class="fas fa-trash"></i> Delete</button>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-clipboard-list"></i>
+                <p>No quizzes created yet. Click "Create New Quiz" to get started.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Recent Results -->
+    <div class="card">
+        <div class="card-header">
+            <h2><i class="fas fa-chart-line"></i> Recent Results</h2>
+            <a href="{{ url_for('admin_results') }}" class="btn btn-sm btn-outline">View All</a>
+        </div>
+        <div class="card-body">
+            {% if recent_results %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Quiz</th>
+                            <th>Score</th>
+                            <th>Percentage</th>
+                            <th>Date</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_results %}
+                        <tr>
+                            <td>{{ r.student_name }}</td>
+                            <td>{{ r.quiz_title }}</td>
+                            <td>{{ r.score }}/{{ r.total }}</td>
+                            <td>
+                                <span
+                                    class="badge {% if r.percentage >= 60 %}badge-success{% elif r.percentage >= 40 %}badge-warning{% else %}badge-danger{% endif %}">
+                                    {{ "%.1f"|format(r.percentage) }}%
+                                </span>
+                            </td>
+                            <td>{{ r.date }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i class="fas fa-chart-bar"></i>
+                <p>No quiz attempts yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
