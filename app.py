@@ -29,16 +29,19 @@ app.secret_key = os.environ.get('SECRET_KEY', 'quiz-engine-secret-key-change-in-
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-# Auto-initialize DB on each request (Vercel /tmp is ephemeral between cold starts)
-_db_initialized = False
+# Auto-initialize DB on each cold start (Vercel /tmp is ephemeral)
+from models import DATABASE
 
 @app.before_request
 def ensure_db():
-    global _db_initialized
-    if not _db_initialized:
-        init_db()
-        seed_data()
-        _db_initialized = True
+    """Initialize DB if it doesn't exist (handles Vercel cold starts)."""
+    try:
+        if not os.path.exists(DATABASE):
+            init_db()
+            seed_data()
+    except Exception:
+        # If DB already exists/initialized by another request, that's fine
+        pass
 
 
 # ──────────────────────────── Auth Decorators ──────────────────────────────
